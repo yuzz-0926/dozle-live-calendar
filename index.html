@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ドズル社 ライブ配信カレンダー</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", sans-serif;
+  background: #ffffff;
+  color: #111111;
+}
+
+header {
+  background: #ffffff;
+  padding: 16px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: #ff0000;
+  border-bottom: 1px solid #dddddd;
+}
+
+#controls {
+  text-align: center;
+  margin: 10px;
+}
+
+button {
+  background: #ff0000;
+  border: none;
+  color: #ffffff;
+  padding: 6px 12px;
+  margin: 0 10px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+button:hover {
+  opacity: 0.85;
+}
+
+#calendar {
+  max-width: 900px;
+  margin: 10px auto;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr); /* ★7曜日を均等幅 */
+  gap: 4px;
+}
+
+.day {
+  border: 1px solid #dddddd;
+  min-height: 80px;
+  padding: 4px;
+  box-sizing: border-box;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.day:hover {
+  background: #f5f5f5;
+}
+
+.day-number {
+  font-size: 14px;
+  color: #333333;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+#liveList {
+  margin-left: auto;
+  max-width: 900px;
+  margin: 20px auto;
+  background: #ffffff;
+  padding: 10px;
+  border: 1px solid #dddddd;
+}
+
+.live-item {
+  border-left: 4px solid;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fafafa;
+}
+
+a {
+  color: #ff0000;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;      /* ★これが中央寄せの本体 */
+  padding: 16px 24px;
+  box-sizing: border-box;
+}
+
+/* 配信状態別 */
+.live-dot.live {
+  border: 2px solid #000;
+}
+
+.live-dot.completed {
+  opacity: 0.3;
+}
+
+.status-label {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.status-live {
+  color: #ff0000;
+}
+
+.status-upcoming {
+  color: #0066ff;
+}
+
+.status-completed {
+  color: #888888;
+}
+
+.day.today {
+  background-color: #f2f2f2; /* 白基調に合う薄いグレー */
+  border: 2px solid #ff0000; /* YouTubeっぽく赤 */
+  box-sizing: border-box;
+}
+
+.calendar-live-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.live-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layout {
+  display: flex;
+  gap: 40px;
+  justify-content: center; /* ★これ重要 */
+}
+
+/* 左：カレンダー */
+.calendar-area {
+  flex: 0 0 480px;
+}
+
+/* 右：ライブ情報 */
+.live-area {
+  flex: 0 0 360px;
+  max-width: 380px;
+}
+
+/* スマホ対応 */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .calendar-area {
+    flex: none;
+    width: 100%;
+  }
+}
+
+.day.empty {
+  background: transparent;
+  border: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="page">
+
+  <header>ドズル社 ライブ配信カレンダー</header>
+
+  <div id="controls">
+    <button onclick="changeMonth(-1)">＜ 前の月</button>
+    <span id="monthLabel"></span>
+    <button onclick="changeMonth(1)">次の月 ＞</button>
+  </div>
+
+  <div class="layout">
+    <div class="calendar-area">
+      <div id="calendar"></div>
+    </div>
+
+    <div class="live-area">
+      <div id="liveList">
+        <h3>読み込み中です</h3>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_KEY = "AIzaSyA9NzX9jTG2Ntkw6tofenOnhm7x4lmWI2U";
+
+// チャンネル情報（色付き）
+const channels = [
+  { name: "ドズル社", id: "UCj4PjeVMnNTHIR5EeoNKPAw", color: "#000000" },
+  { name: "ドズル", id: "UCcHiyP5BmBzbIW61W_tio7Q", color: "#ff0000" },
+  { name: "ぼんじゅうる", id: "UC7fNaSMYW29jHQmYZgZ5rkA", color: "#800080" },
+  { name: "おんりー", id: "UC5l8bnxxl26Q5PDG_jawcuw", color: "#ffff00" },
+  { name: "おらふくん", id: "UCIEgmfyQSPwrjXt1QpmNv0w", color: "#0000ff" },
+  { name: "おおはらMEN", id: "UCJk7u2v3Ib7M0e-k8TWPx5Q", color: "#ff69b4" }
+];
+
+let liveEvents = {};
+let currentDate = new Date();
+
+const calendarEl = document.getElementById("calendar");
+const liveListEl = document.getElementById("liveList");
+const monthLabel = document.getElementById("monthLabel");
+
+function toJST(dateStr) {
+  return new Date(dateStr).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+}
+
+function getTodayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function renderCalendar() {
+  calendarEl.innerHTML = "";
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+
+  monthLabel.textContent = `${year}年 ${month + 1}月`;
+
+  const grid = document.createElement("div");
+  grid.className = "calendar-grid";
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i++) {
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    grid.appendChild(empty);
+  }
+
+  const todayStr = getTodayStr();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+   const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+   const cell = document.createElement("div");
+   cell.className = "day";
+
+   // ★ 今日ならハイライト
+   if (dateStr === todayStr) {
+     cell.classList.add("today");
+   }
+
+   cell.innerHTML = `<div class="day-number">${day}</div>`;
+
+  if (liveEvents[dateStr]) {
+   liveEvents[dateStr].forEach(live => {
+   const item = document.createElement("div");
+   item.className = "calendar-live-item";
+
+   const dot = document.createElement("span");
+   dot.className = "live-dot " + live.status;
+   dot.style.background = live.color;
+
+   const name = document.createElement("span");
+   name.className = "live-name";
+   name.textContent = live.channel;
+
+   item.appendChild(dot);
+   item.appendChild(name);
+   cell.appendChild(item);
+   });
+  }
+
+    cell.onclick = () => showLives(dateStr);
+    grid.appendChild(cell);
+  }
+
+  calendarEl.appendChild(grid);
+
+// 今日を自動で開く（既にある todayStr を使う）
+showLives(todayStr);
+}
+
+function showLives(dateStr) {
+  liveListEl.innerHTML = `<h3>${dateStr} のライブ配信</h3>`;
+
+  if (!liveEvents[dateStr]) {
+    liveListEl.innerHTML += "<p>ライブ配信はありません</p>";
+    return;
+  }
+// 状態ごとの優先順位
+const statusOrder = {
+  live: 0,
+  upcoming: 1,
+  completed: 2
+};
+
+// 配信中 → 予定 → 過去 の順に並び替え
+const sortedLives = [...liveEvents[dateStr]].sort((a, b) => {
+  return statusOrder[a.status] - statusOrder[b.status];
+});
+
+  sortedLives.forEach(live => {
+    let statusText = "";
+    let statusClass = "";
+
+    if (live.status === "live") {
+      statusText = "🔴 配信中";
+      statusClass = "status-live";
+    } else if (live.status === "upcoming") {
+      statusText = "🔵 配信予定";
+      statusClass = "status-upcoming";
+    } else if (live.status === "completed") {
+      statusText = "⚪ 過去の配信";
+      statusClass = "status-completed";
+    }
+
+    liveListEl.innerHTML += `
+      <div class="live-item" style="border-color:${live.color}">
+        <div class="status-label ${statusClass}">${statusText}</div>
+        <div><strong>${live.time}</strong></div>
+        <div>${live.title}</div>
+        <div>${live.channel}</div>
+        <a href="https://www.youtube.com/watch?v=${live.videoId}" target="_blank">
+          YouTubeで見る
+        </a>
+      </div>
+    `;
+  });
+}
+
+function changeMonth(diff) {
+  currentDate.setMonth(currentDate.getMonth() + diff);
+  renderCalendar();
+}
+
+async function fetchLives() {
+  liveEvents = {};
+
+  for (const ch of channels) {
+    await fetchByStatus(ch, "upcoming");
+    await fetchByStatus(ch, "live");
+    await fetchByStatus(ch, "completed");
+  }
+
+  renderCalendar();
+}
+
+async function fetchByStatus(ch, status) {
+  const searchUrl =
+    `https://www.googleapis.com/youtube/v3/search?` +
+    `part=snippet&channelId=${ch.id}` +
+    `&eventType=${status}&type=video&maxResults=10&key=${API_KEY}`;
+
+  const searchRes = await fetch(searchUrl);
+  const searchData = await searchRes.json();
+  if (!searchData.items) return;
+
+  const videoIds = searchData.items
+    .map(item => item.id.videoId)
+    .filter(Boolean)
+    .join(",");
+
+  if (!videoIds) return;
+
+  const videoUrl =
+    `https://www.googleapis.com/youtube/v3/videos?` +
+    `part=liveStreamingDetails,snippet&id=${videoIds}&key=${API_KEY}`;
+
+  const videoRes = await fetch(videoUrl);
+  const videoData = await videoRes.json();
+  if (!videoData.items) return;
+
+  videoData.items.forEach(item => {
+    const live = item.liveStreamingDetails;
+    if (!live) return;
+
+    const startTime =
+      live.scheduledStartTime ||
+      live.actualStartTime ||
+      item.snippet.publishedAt;
+
+    const start = new Date(startTime);
+
+    const date = start.toISOString().split("T")[0];
+    const time = start.toLocaleTimeString("ja-JP", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Tokyo"
+    });
+
+    if (!liveEvents[date]) liveEvents[date] = [];
+    liveEvents[date].push({
+      title: item.snippet.title,
+      channel: ch.name,
+      color: ch.color,
+      time: time,
+      videoId: item.id,
+      status: status
+    });
+  });
+}
+fetchLives();
+</script>
+
+</body>
+</html>
